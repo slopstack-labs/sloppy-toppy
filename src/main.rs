@@ -55,16 +55,12 @@ fn run(terminal: &mut ratatui::DefaultTerminal, app: &mut App) -> std::io::Resul
                             app.jokes.roast_now();
                         }
                     }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        if app.history_visible {
-                            app.history_scroll = app.history_scroll.saturating_sub(1);
-                        }
+                    KeyCode::Char('k') | KeyCode::Up if app.history_visible => {
+                        app.history_scroll = app.history_scroll.saturating_sub(1);
                     }
-                    KeyCode::Down => {
-                        if app.history_visible {
-                            let max = app.roast_history.len().saturating_sub(1);
-                            app.history_scroll = (app.history_scroll + 1).min(max);
-                        }
+                    KeyCode::Down if app.history_visible => {
+                        let max = app.roast_history.len().saturating_sub(1);
+                        app.history_scroll = (app.history_scroll + 1).min(max);
                     }
                     KeyCode::Char('h') => {
                         app.history_visible = !app.history_visible;

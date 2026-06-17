@@ -189,7 +189,7 @@ fn draw_joke(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     // Alert blink: flash red every other tick for alert_flash_ticks ticks.
-    let border_color = if app.alert_flash_ticks > 0 && app.tick_count % 2 == 0 {
+    let border_color = if app.alert_flash_ticks > 0 && app.tick_count.is_multiple_of(2) {
         Color::Red
     } else if app.is_thinking {
         Color::Magenta

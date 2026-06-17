@@ -111,8 +111,7 @@ impl Collector {
                 l.contains("package") || l.contains("tctl") || l.contains("cpu")
             })
             .or_else(|| self.components.iter().next())
-            .map(|c| c.temperature())
-            .flatten();
+            .and_then(|c| c.temperature());
 
         let mut top_procs: Vec<ProcRow> = self
             .sys

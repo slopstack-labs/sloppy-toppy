@@ -72,7 +72,7 @@ impl App {
         let now = Instant::now();
         let cooldown_ok = self
             .last_alert
-            .map_or(true, |t| now.duration_since(t).as_secs() >= 60);
+            .is_none_or(|t| now.duration_since(t).as_secs() >= 60);
 
         if (cpu_pct > self.alert_cpu || mem_pct > self.alert_mem) && cooldown_ok {
             self.jokes.roast_now();
