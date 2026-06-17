@@ -99,7 +99,7 @@ impl Collector {
         let (disk_used, disk_total) = self
             .disks
             .iter()
-            .find(|d| d.mount_point() == std::path::Path::new("/"))
+            .find(|d| d.mount_point() == root_disk_path().as_path())
             .map(|d| (d.total_space() - d.available_space(), d.total_space()))
             .unwrap_or((0, 0));
 
@@ -164,4 +164,15 @@ pub fn fmt_bytes(bytes: u64) -> String {
     } else {
         format!("{value:.1} {}", UNITS[unit])
     }
+}
+
+#[cfg(target_os = "windows")]
+fn root_disk_path() -> std::path::PathBuf {
+    let drive = std::env::var("SYSTEMDRIVE").unwrap_or_else(|_| "C:".to_string());
+    std::path::PathBuf::from(format!("{drive}\\"))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn root_disk_path() -> std::path::PathBuf {
+    std::path::PathBuf::from("/")
 }

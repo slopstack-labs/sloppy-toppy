@@ -68,11 +68,19 @@ impl Config {
 }
 
 fn config_path() -> Option<PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    Some(
-        PathBuf::from(home)
-            .join(".config")
-            .join("sloppy-toppy")
-            .join("config.toml"),
-    )
+    #[cfg(target_os = "windows")]
+    {
+        let base = std::env::var("APPDATA").ok()?;
+        Some(PathBuf::from(base).join("sloppy-toppy").join("config.toml"))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let home = std::env::var("HOME").ok()?;
+        Some(
+            PathBuf::from(home)
+                .join(".config")
+                .join("sloppy-toppy")
+                .join("config.toml"),
+        )
+    }
 }

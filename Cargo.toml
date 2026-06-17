@@ -2,7 +2,7 @@
 name = "sloppy-toppy"
 version = "0.1.0"
 edition = "2021"
-description = "A htop/btop-inspired system monitor that unnecessarily routes your vitals through a local LLM so it can roast you."
+description = "A system monitor that seductively roasts you for your PC usage."
 
 [[bin]]
 name = "sloppy-toppy"
