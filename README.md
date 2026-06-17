@@ -4,6 +4,8 @@
 > "We didn't reinvent the system monitor. We asked an AI to be rude about it."
 > — sloppy-toppy Engineering Blog, Issue 1 (Final)
 
+![sloppy-toppy screenshot](docs/image.png)
+
 **sloppy-toppy** is a next-generation, AI-first, LLM-native terminal system monitor that leverages the full generative power of large language models to holistically surface your machine's vitals — and then have those vitals ridiculed by a crude, mean-spirited inference substrate in real time.
 
 Traditional system monitors are cold, silent, and constrained by decades of deterministic metric delivery. They display numbers. They render bars. They enforce a single correct interpretation of your CPU load. sloppy-toppy moves observation to the inference layer, reasoning about your *performance* rather than merely *reporting* it — eliminating the emotionally sterile intermediate steps that have constrained the monitoring experience for decades. The bottleneck is no longer your hardware. It's your willingness to be roasted.

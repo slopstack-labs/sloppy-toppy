@@ -1,11 +1,9 @@
 //! System metrics collection, wrapped around `sysinfo`.
 
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::{Components, Disks, Networks, ProcessesToUpdate, System};
 
-/// How many points of per-core CPU history we keep for the sparkline-ish display.
 const HISTORY_LEN: usize = 60;
 
-/// A single process row shown in the table.
 #[derive(Clone)]
 pub struct ProcRow {
     pub pid: u32,
@@ -14,7 +12,6 @@ pub struct ProcRow {
     pub mem_bytes: u64,
 }
 
-/// A snapshot of everything the UI (and the LLM) cares about.
 #[derive(Clone, Default)]
 pub struct Snapshot {
     pub cpu_overall: f32,
@@ -26,49 +23,55 @@ pub struct Snapshot {
     pub uptime_secs: u64,
     pub load_one: f64,
     pub top_procs: Vec<ProcRow>,
+    pub net_rx_bps: u64,
+    pub net_tx_bps: u64,
+    pub disk_read_bps: u64,
+    pub disk_write_bps: u64,
+    pub disk_used: u64,
+    pub disk_total: u64,
+    pub cpu_temp: Option<f32>,
 }
 
 impl Snapshot {
     pub fn mem_frac(&self) -> f64 {
-        if self.mem_total == 0 {
-            0.0
-        } else {
-            self.mem_used as f64 / self.mem_total as f64
-        }
+        if self.mem_total == 0 { 0.0 } else { self.mem_used as f64 / self.mem_total as f64 }
     }
-
     pub fn swap_frac(&self) -> f64 {
-        if self.swap_total == 0 {
-            0.0
-        } else {
-            self.swap_used as f64 / self.swap_total as f64
-        }
+        if self.swap_total == 0 { 0.0 } else { self.swap_used as f64 / self.swap_total as f64 }
+    }
+    pub fn disk_frac(&self) -> f64 {
+        if self.disk_total == 0 { 0.0 } else { self.disk_used as f64 / self.disk_total as f64 }
     }
 }
 
-/// Owns the `sysinfo::System` and a rolling history of overall CPU usage.
 pub struct Collector {
     sys: System,
+    networks: Networks,
+    disks: Disks,
+    components: Components,
     pub cpu_history: Vec<u64>,
 }
 
 impl Collector {
     pub fn new() -> Self {
         let mut sys = System::new_all();
-        // Prime the CPU counters; the first reading is always garbage.
         sys.refresh_cpu_usage();
         Collector {
             sys,
+            networks: Networks::new_with_refreshed_list(),
+            disks: Disks::new_with_refreshed_list(),
+            components: Components::new_with_refreshed_list(),
             cpu_history: Vec::with_capacity(HISTORY_LEN),
         }
     }
 
-    /// Refresh all subsystems and return a fresh snapshot.
     pub fn sample(&mut self) -> Snapshot {
         self.sys.refresh_cpu_usage();
         self.sys.refresh_memory();
-        self.sys
-            .refresh_processes(ProcessesToUpdate::All, true);
+        self.sys.refresh_processes(ProcessesToUpdate::All, true);
+        self.networks.refresh(false);
+        self.disks.refresh(false);
+        self.components.refresh(false);
 
         let per_core: Vec<f32> = self.sys.cpus().iter().map(|c| c.cpu_usage()).collect();
         let cpu_overall = self.sys.global_cpu_usage();
@@ -78,6 +81,38 @@ impl Collector {
             let overflow = self.cpu_history.len() - HISTORY_LEN;
             self.cpu_history.drain(0..overflow);
         }
+
+        let (net_rx_bps, net_tx_bps) = self
+            .networks
+            .iter()
+            .filter(|(name, _)| name.as_str() != "lo")
+            .fold((0u64, 0u64), |acc, (_, d)| {
+                (acc.0 + d.received(), acc.1 + d.transmitted())
+            });
+
+        let (disk_read_bps, disk_write_bps) =
+            self.sys.processes().values().fold((0u64, 0u64), |acc, p| {
+                let du = p.disk_usage();
+                (acc.0 + du.read_bytes, acc.1 + du.written_bytes)
+            });
+
+        let (disk_used, disk_total) = self
+            .disks
+            .iter()
+            .find(|d| d.mount_point() == std::path::Path::new("/"))
+            .map(|d| (d.total_space() - d.available_space(), d.total_space()))
+            .unwrap_or((0, 0));
+
+        let cpu_temp = self
+            .components
+            .iter()
+            .find(|c| {
+                let l = c.label().to_lowercase();
+                l.contains("package") || l.contains("tctl") || l.contains("cpu")
+            })
+            .or_else(|| self.components.iter().next())
+            .map(|c| c.temperature())
+            .flatten();
 
         let mut top_procs: Vec<ProcRow> = self
             .sys
@@ -91,7 +126,7 @@ impl Collector {
             })
             .collect();
         top_procs.sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap_or(std::cmp::Ordering::Equal));
-        top_procs.truncate(12);
+        top_procs.truncate(50);
 
         let load = System::load_average();
 
@@ -105,11 +140,17 @@ impl Collector {
             uptime_secs: System::uptime(),
             load_one: load.one,
             top_procs,
+            net_rx_bps,
+            net_tx_bps,
+            disk_read_bps,
+            disk_write_bps,
+            disk_used,
+            disk_total,
+            cpu_temp,
         }
     }
 }
 
-/// Human-friendly bytes (KiB/MiB/GiB).
 pub fn fmt_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
